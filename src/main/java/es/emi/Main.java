@@ -19,7 +19,7 @@ public class Main {
         int numPieces = 1;
 
         Machine machine = new Machine(1, 3600, new Calendar(Arrays.asList(
-                new TimeSlot(ZonedDateTime.parse("2024-08-07T00:00:00Z"), ZonedDateTime.parse("2024-08-07T01:00:00Z")),
+                new TimeSlot(ZonedDateTime.parse("2024-08-07T02:00:00Z"), ZonedDateTime.parse("2024-08-07T03:30:00Z")),
                 new TimeSlot(ZonedDateTime.parse("2024-08-07T02:00:00Z"), ZonedDateTime.parse("2024-08-07T03:30:00Z")),
                 new TimeSlot(ZonedDateTime.parse("2024-08-07T05:30:00Z"), ZonedDateTime.parse("2024-08-07T08:00:00Z")))));
 
