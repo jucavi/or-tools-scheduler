@@ -9,40 +9,20 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MultiMachineScheduling {
 
-    private static final ZonedDateTime REFERENCE_POINT = ZonedDateTime.of(LocalDate.of(2024, 8, 7), LocalTime.of(0, 0), ZoneId.of("UTC"));
 
-    public static void main(String[] args) {
+    public static void solver(int numMachines, int numPieces, int[] cycleTimes, ZonedDateTime[][][] productiveIntervals, int maxEnd) {
+
+        // TODO: Reference point must be the minimum start date time
+        final ZonedDateTime REFERENCE_POINT = ZonedDateTime.of(LocalDate.of(2024, 8, 7), LocalTime.of(0, 0), ZoneId.of("UTC"));
+
         Loader.loadNativeLibraries();
 
-        int numMachines = 3; // Number of machines
-        int numPieces = 5;   // Number of pieces to produce
-        int maxEnd = 43200;
-
-        // Cycle times for each machine
-        int[] cycleTimes = {3600, 5400, 7200}; // Example cycle times for M1, M2, M3 (in seconds)
-
-
-        // Define productive intervals for each machine using ZonedDateTime
-        ZonedDateTime[][][] productiveIntervals = {
-                {
-                        {ZonedDateTime.parse("2024-08-07T00:30:00Z"), ZonedDateTime.parse("2024-08-07T01:30:00Z")},
-                        {ZonedDateTime.parse("2024-08-07T02:00:00Z"), ZonedDateTime.parse("2024-08-07T03:30:00Z")},
-                },
-                {
-                        {ZonedDateTime.parse("2024-08-07T00:30:00Z"), ZonedDateTime.parse("2024-08-07T02:00:00Z")},
-                        {ZonedDateTime.parse("2024-08-07T05:30:00Z"), ZonedDateTime.parse("2024-08-07T08:00:00Z")},
-                },
-                {
-                        {ZonedDateTime.parse("2024-08-07T01:00:00Z"), ZonedDateTime.parse("2024-08-07T03:00:00Z")},
-                        {ZonedDateTime.parse("2024-08-07T04:30:00Z"), ZonedDateTime.parse("2024-08-07T06:30:00Z")},
-                }
-        };
-
-
-        // Convert ZonedDateTime to integer seconds from the reference point
+        // Convert ZonedDateTime to integer seconds from a reference (min start time interval starts from 0)
         int[][][] productiveIntervalsInSeconds = Arrays.stream(productiveIntervals)
                 .map(machineIntervals -> Arrays.stream(machineIntervals)
                         .map(interval -> new int[]{
@@ -53,7 +33,7 @@ public class MultiMachineScheduling {
                 .toArray(int[][][]::new);
 
 
-        // Create the model
+        // Initializing model
         CpModel model = new CpModel();
 
         // Decision variables
@@ -62,9 +42,8 @@ public class MultiMachineScheduling {
         IntVar[][] endTimes = new IntVar[numMachines][];
         BoolVar[][] isTaskActive = new BoolVar[numMachines][];
 
-        // Initialize variables for each machine and piece
+        // Initialize intervals variables for each machine and piece
         for (int m = 0; m < numMachines; m++) {
-
             tasks[m] = new IntervalVar[numPieces];
             startTimes[m] = new IntVar[numPieces];
             endTimes[m] = new IntVar[numPieces];
@@ -78,14 +57,14 @@ public class MultiMachineScheduling {
                 // Create the IntervalVar as an optional interval
                 tasks[m][i] = model.newOptionalIntervalVar(
                         startTimes[m][i],
-                        LinearExpr.constant(cycleTimes[m]), endTimes[m][i],
-                        isTaskActive[m][i], "task_machine_" + m + "_piece_" + i + "_interval");
+                        LinearExpr.constant(cycleTimes[m]),
+                        endTimes[m][i],
+                        isTaskActive[m][i], "task_machine_" + m + "_piece_" + i);
             }
         }
 
         // Ensure each piece is assigned to exactly one machine
         for (int i = 0; i < numPieces; i++) {
-
             BoolVar[] assignment = new BoolVar[numMachines];
             for (int m = 0; m < numMachines; m++) {
                 assignment[m] = isTaskActive[m][i];
@@ -95,17 +74,18 @@ public class MultiMachineScheduling {
 
         // Constraints for each machine
         for (int m = 0; m < numMachines; m++) {
-
             for (int i = 0; i < numPieces; i++) {
-                IntVar[] inIntervalConstraints = new IntVar[productiveIntervalsInSeconds[m].length];
+
+                IntVar[] inIntervalConstraints = new IntVar[productiveIntervalsInSeconds[m].length]; // constraint for intervals
 
                 for (int j = 0; j < productiveIntervalsInSeconds[m].length; j++) {
-
+                    // validates piece programed in valid interval
                     BoolVar isInInterval = model.newBoolVar("isInInterval_machine_" + m + "_piece_" + i + "_interval_" + j);
 
                     model.addGreaterOrEqual(startTimes[m][i], productiveIntervalsInSeconds[m][j][0]).onlyEnforceIf(isInInterval);
                     model.addLessOrEqual(endTimes[m][i], productiveIntervalsInSeconds[m][j][1]).onlyEnforceIf(isInInterval);
 
+                    // set validation
                     inIntervalConstraints[j] = isInInterval;
                 }
 
@@ -114,13 +94,13 @@ public class MultiMachineScheduling {
             }
         }
 
-        // **Preference constraints based on cycle times**
+        // Hint for preferred machine assignment based on cycle times (faster machines first)
         for (int i = 0; i < numPieces; i++) {
-
             int minCycleTime = Integer.MAX_VALUE;
             int preferredMachine = -1;
 
-            // Identify the machine with the minimum cycle time for this task
+            // Identify the machine with the minimum cycle time for this piece
+            // keep cy
             for (int m = 0; m < numMachines; m++) {
                 if (cycleTimes[m] < minCycleTime) {
                     minCycleTime = cycleTimes[m];
@@ -131,6 +111,10 @@ public class MultiMachineScheduling {
             // Add a hint to prefer the machine with the lower cycle time for this task
             model.addHint(isTaskActive[preferredMachine][i], 1);
         }
+
+//        for (int m = 0; m < numMachines; m++) {
+//            model.addAssumptions(isTaskActive[m]);
+//        }
 
         // Ensure no overlap between tasks on the same machine
         for (int m = 0; m < numMachines; m++) {
@@ -144,6 +128,9 @@ public class MultiMachineScheduling {
                 .toArray(IntVar[]::new);
         model.addMaxEquality(makespan, allEndTimes);
         model.minimize(makespan);
+
+        // Configure workers
+        ExecutorService executor = Executors.newFixedThreadPool(16);
 
         // Solve the model
         CpSolver solver = new CpSolver();
