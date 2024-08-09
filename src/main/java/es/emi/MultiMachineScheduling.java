@@ -147,6 +147,7 @@ public class MultiMachineScheduling {
 
         // Solve the model
         CpSolver solver = new CpSolver();
+        solver.getParameters().setLogSearchProgress(true);
         CpSolverStatus status = solver.solve(model);
 
         // Display results
