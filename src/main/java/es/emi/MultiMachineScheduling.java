@@ -26,6 +26,7 @@ public class MultiMachineScheduling {
         int[][][] productiveIntervalsInSeconds = Arrays.stream(productiveIntervals)
                 .map(machineIntervals -> Arrays.stream(machineIntervals)
                         .map(interval -> new int[]{
+                                // normalize
                                 (int) ChronoUnit.SECONDS.between(REFERENCE_POINT, interval[0]),
                                 (int) ChronoUnit.SECONDS.between(REFERENCE_POINT, interval[1])
                         })
@@ -116,41 +117,51 @@ public class MultiMachineScheduling {
 //            model.addAssumptions(isTaskActive[m]);
 //        }
 
-        // Ensure no overlap between tasks on the same machine
+        // No overlap between pieces(task) on the same machine
         for (int m = 0; m < numMachines; m++) {
             model.addNoOverlap(tasks[m]);
         }
 
-        // Objective: Minimize the makespan
+        // OBJETIVE: Minimize the makespan
         IntVar makespan = model.newIntVar(0, maxEnd, "makespan");
         IntVar[] allEndTimes = Arrays.stream(endTimes)
                 .flatMap(Arrays::stream)
                 .toArray(IntVar[]::new);
+
         model.addMaxEquality(makespan, allEndTimes);
         model.minimize(makespan);
 
         // Configure workers
-        ExecutorService executor = Executors.newFixedThreadPool(16);
+//        ExecutorService executor = Executors.newFixedThreadPool(16);
 
         // Solve the model
         CpSolver solver = new CpSolver();
+        // Enable log info (for mind sanity!)
         solver.getParameters().setLogSearchProgress(true);
+        // Solve the stuff
         CpSolverStatus status = solver.solve(model);
 
         // Display results
         if (status == CpSolverStatus.OPTIMAL || status == CpSolverStatus.FEASIBLE) {
+
             System.out.println("Solution found:");
+
             for (int m = 0; m < numMachines; m++) {
                 for (int i = 0; i < numPieces; i++) {
                     if (solver.booleanValue(isTaskActive[m][i])) {
+
+                        // Denormalize dates
                         ZonedDateTime start = REFERENCE_POINT.plusSeconds(solver.value(startTimes[m][i]));
                         ZonedDateTime end = REFERENCE_POINT.plusSeconds(solver.value(endTimes[m][i]));
                         System.out.printf("Machine %d, Task %d: Start at %s, End at %s%n", m, i, start, end);
                     }
                 }
             }
+
+            // Denormalize makeSpan
             ZonedDateTime makespanEnd = REFERENCE_POINT.plusSeconds(solver.value(makespan));
             System.out.println("Makespan: " + makespanEnd);
+
         } else {
             System.out.println("No feasible solution found.");
         }
