@@ -13,16 +13,16 @@ public class Main {
     public static void main(String[] args) {
 
         int intervals = 100;
-        int duration = 15*60; // seconds
+        int intervalDuration = 15*60; // seconds
 
         int numMachines = 12; // Number of machines
         int numPieces = 20;   // Number of pieces to produce
         // Cycle times for each machine
         int[] cycleTimes = {15 * 60, 30 * 60, 60 * 60, 15 * 60, 30 * 60, 60 * 60, 15 * 60, 30 * 60, 60 * 60, 15 * 60, 30 * 60, 60 * 60, 15 * 60, 30 * 60, 60 * 60, 15 * 60, 30 * 60, 60 * 60, 15 * 60, 30 * 60, 60 * 60}; // Example cycle times for M1, M2, M3 (in seconds)
-//        int[] cycleTimes = {3600, 5400, 7200}; // Example cycle times for M1, M2, M3 (in seconds)
-//        int[] cycleTimes = {3600, 3600, 3600}; // Example cycle times for M1, M2, M3 (in seconds)
+//        int[] cycleTimes = {3600, 5400, 7200};
+//        int[] cycleTimes = {3600, 3600, 3600};
         // Must be the far date time (horizon)
-        int maxEnd = 432000;
+        int maxEnd = 24*60*60*60;
 
         // Define productive intervals for each machine using ZonedDateTime
 //        ZonedDateTime[][][] productiveIntervals = {
@@ -41,11 +41,31 @@ public class Main {
 //                }
 //        };
 
-        ZonedDateTime[][][] productiveIntervals = generateMachinesCalendars(REFERENCE_POINT, duration, intervals, numMachines);
+        ZonedDateTime[][][] productiveIntervals = generateMachinesCalendars(REFERENCE_POINT, intervalDuration, intervals, numMachines);
 
+        long start = ZonedDateTime.now().toEpochSecond();
         MultiMachineScheduling.solver(numMachines, numPieces, cycleTimes, productiveIntervals, maxEnd);
+        long end = ZonedDateTime.now().toEpochSecond();
 
-//        System.out.println(Arrays.deepToString(generateMachinesCalendars(REFERENCE_POINT, 15 * 60, 200, 3)));
+
+        long startA = ZonedDateTime.now().toEpochSecond();
+        MultiMachineSchedulingA.solver(numMachines, numPieces, cycleTimes, productiveIntervals, maxEnd);
+        long endA = ZonedDateTime.now().toEpochSecond();
+
+
+        long startB = ZonedDateTime.now().toEpochSecond();
+        MultiMachineSchedulingB.solver(numMachines, numPieces, cycleTimes, productiveIntervals, maxEnd);
+        long endB = ZonedDateTime.now().toEpochSecond();
+
+
+        long startC = ZonedDateTime.now().toEpochSecond();
+        MultiMachineSchedulingC.solver(numMachines, numPieces, cycleTimes, productiveIntervals);
+        long endC = ZonedDateTime.now().toEpochSecond();
+
+        System.out.println("Solved in " + (end - start) + " seconds");
+        System.out.println("SolvedA in " + (endA - startA) + " seconds");
+        System.out.println("SolvedB in " + (endB - startB) + " seconds");
+        System.out.println("SolvedC in " + (endC - startC) + " seconds");
     }
 
 

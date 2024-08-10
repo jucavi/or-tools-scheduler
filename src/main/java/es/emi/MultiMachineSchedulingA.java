@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class MultiMachineScheduling {
+public class MultiMachineSchedulingA {
 
     public static void solver(int numMachines, int numPieces, int[] cycleTimes, ZonedDateTime[][][] productiveIntervals, int maxEnd) {
 
@@ -152,3 +152,4 @@ public class MultiMachineScheduling {
         }
     }
 }
+
